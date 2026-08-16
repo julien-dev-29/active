@@ -1,9 +1,7 @@
 import pyfiglet
 import sys
-import socket
 from passlib.context import CryptContext
-
-DEFAULT_TIMEOUT= 1.0
+from scanner import DEFAULT_TIMEOUT, scan_tcp, scan_udp
 
 USAGE = """Usage: tinyscanner [OPTIONS] [HOST] [PORT]
 Options:
@@ -17,28 +15,13 @@ port_list = [21, 22, 25, 80, 443]
 
 HOST = "127.0.0.1"
 
-myctx = CryptContext(schemes=["sha256_crypt", "md5_crypt", "des_crypt"])
-hashed = myctx.hash("yolo les kikis!")
-
 def displayBanner():
     ascii_banner = pyfiglet.figlet_format("TINY SCANNER", "doom")
     print (ascii_banner)
 
-def readFile():
-    dictFile = open("words.txt", "r")
-    for word in dictFile.readlines():
-        word = word.strip('\n')
-
-def scan_ftp(host, port, timeout=DEFAULT_TIMEOUT):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(timeout)
-    try:
-        sock.connect((host, port))
-        return True
-    except OSError:
-        return False
-    finally:
-        sock.close()
+def _fail(message):
+    print(f"tinyscanner: {message}", file=sys.stderr)
+    return 1
 
 def main(argv=None):
     displayBanner()
@@ -48,15 +31,49 @@ def main(argv=None):
         sys.stdout.write(USAGE)
         return 0
 
-    for port in port_list:
-        print ("[+] Checking " + HOST + ":" + str(port))
-        isOpen = scan_ftp(HOST, port)
-        if isOpen:
-            print ("Port:" + str(port) + " is open")
-        else:
-            print ("Port:" + str(port) + " is closed")
+    tcp = False
+    udp = False
+    port_spec = None
+    host = None
+    positional = []
 
-    return 0
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "-p":
+            if i + 1 >= len(args):
+                return _fail("option -p requires an argument")
+            if port_spec is not None:
+                return _fail("option -p given more than once")
+            port_spec = args[i + 1]
+            i+=2
+        elif arg == "-u":
+            udp = True
+            i += 1
+        elif arg == "-t":
+            tcp = True
+            i += 1
+        elif arg.startswith("-"):
+            return _fail(f"unknow option '{arg}'")
+        elif host is None:
+            host = arg
+            i += 1
+        else:
+            positional.append(arg)
+            i += 1
+
+    if tcp and udp:
+        return _fail("cannot scan both TCP and UDP at once (choose -t or -u)")
+    if host is None:
+        return _fail("missing HOST argument")
+
+    if port_spec is not None and positional:
+        return _fail("port given both positionally and via '-p'")
+    if len(positional) > 1:
+        return _fail("too many arguments")
+    spec = port_spec if port_spec is not None else (positional[0] if positional else None)
+    if spec is None:
+        return _fail("missing PORT argument")
 
 if __name__ == "__main__":
     sys.exit(main())
