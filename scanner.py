@@ -36,7 +36,7 @@ def parse_port_spec(spec):
             raise ValueError(f"invalid port range '{spec}'")
         return list(range(start, end + 1))
     port = int(spec)
-    if port < 1 or port > 65535 or start > end:
+    if port < 1 or port > 65535:
         raise ValueError(f"invalid port '{port}'")
     return [port]
 

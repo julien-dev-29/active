@@ -1,79 +1,65 @@
-import pyfiglet
+import socket
+import argparse
 import sys
-from passlib.context import CryptContext
-from scanner import DEFAULT_TIMEOUT, scan_tcp, scan_udp
 
-USAGE = """Usage: tinyscanner [OPTIONS] [HOST] [PORT]
-Options:
-  -p               Range of ports to scan
-  -u               UDP scan
-  -t               TCP scan
-  --help           Show this message and exit.
-"""
+def tcp_scan(host, port):
+    try:
+        conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        conn.settimeout(1)
+        conn.connect((host, port))
+        print(f"[+] {port}/tcp open")
+        conn.close()
+    except:
+        print(f"[-] {port}/tcp closed")
 
-port_list = [21, 22, 25, 80, 443]
+def upd_scan(host, port):
+    try:
+        conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        conn.settimeout(1)
+        conn.connect((host, port))
+        print(f"[+] {port}/udp open")
+        conn.close()
+    except:
+        print(f"[-] {port}/udp closed")
+    
+def parse_ports(port_str):
+    ports = []
+    if '-' in port_str:
+        start, end = map(int, port_str.split('-'))
+        ports = range(start, end + 1)
+    else:
+        ports = [int(port_str)]
+    return ports
 
-HOST = "127.0.0.1"
+def main():
+    parser = argparse.ArgumentParser(
+        prog="TINY SCANNER",
+        description="TCP, UDP scanner for educational purpose",
+        epilog="Happy hacking! :)"
+    )
+    parser.add_argument("-u",action="store_true", help="UDP scan")
+    parser.add_argument("-t",action="store_true", help="TCP scan")
+    parser.add_argument("host", help="Target host IP address")
+    parser.add_argument("-p", dest="ports", required=True, help="Range of ports to scan")
+    args = parser.parse_args()
+    ports = parse_ports(args.ports)
+    host = args.host
+    scan_func = upd_scan if args.u else tcp_scan
+    try:
+        ip = socket.gethostbyname(host)
+    except:
+        print(f"[-] Cannot resolve {host}: Unknow host")
 
-def displayBanner():
-    ascii_banner = pyfiglet.figlet_format("TINY SCANNER", "doom")
-    print (ascii_banner)
+    try:
+        name = socket.gethostbyaddr(ip)
+        print(f"\n[+] Scan results for {name[0]}")
+    except:
+        print(f"\n[-] Scan results for {ip}")
 
-def _fail(message):
-    print(f"tinyscanner: {message}", file=sys.stderr)
-    return 1
+    for port in ports:
+        print(f"Scanning port {port}")
+        scan_func(host, port)
 
-def main(argv=None):
-    displayBanner()
-    args = list(argv) if argv is not None else sys.argv[1:]
-
-    if "--help" in args:
-        sys.stdout.write(USAGE)
-        return 0
-
-    tcp = False
-    udp = False
-    port_spec = None
-    host = None
-    positional = []
-
-    i = 0
-    while i < len(args):
-        arg = args[i]
-        if arg == "-p":
-            if i + 1 >= len(args):
-                return _fail("option -p requires an argument")
-            if port_spec is not None:
-                return _fail("option -p given more than once")
-            port_spec = args[i + 1]
-            i+=2
-        elif arg == "-u":
-            udp = True
-            i += 1
-        elif arg == "-t":
-            tcp = True
-            i += 1
-        elif arg.startswith("-"):
-            return _fail(f"unknow option '{arg}'")
-        elif host is None:
-            host = arg
-            i += 1
-        else:
-            positional.append(arg)
-            i += 1
-
-    if tcp and udp:
-        return _fail("cannot scan both TCP and UDP at once (choose -t or -u)")
-    if host is None:
-        return _fail("missing HOST argument")
-
-    if port_spec is not None and positional:
-        return _fail("port given both positionally and via '-p'")
-    if len(positional) > 1:
-        return _fail("too many arguments")
-    spec = port_spec if port_spec is not None else (positional[0] if positional else None)
-    if spec is None:
-        return _fail("missing PORT argument")
 
 if __name__ == "__main__":
     sys.exit(main())

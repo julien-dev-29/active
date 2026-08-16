@@ -3,6 +3,7 @@ import threading
 import sys
 import hashlib
 import argparse
+import time
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 9999
@@ -28,6 +29,7 @@ def verify_password(password, salt, digest):
     return hashlib.sha256((salt + password).encode()).hexdigest() == digest
 
 class LoginServer:
+    
     def __init__(self, users, host=HOST, port=DEFAULT_PORT):
         self.host = host
         self.users = users
@@ -97,6 +99,10 @@ class LoginServer:
         finally:
             conn.close()
 
+    def _log(self, addr, username, password, result):
+        ts = time.strftime("%Y-%m-%d %H:%M:%S")
+        ip, port = addr
+        print(f"[{ts}] {ip}:{port} user={username} pass={password!r} -> {result}")
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="authserver",
